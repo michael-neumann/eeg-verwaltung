@@ -1,0 +1,12 @@
+# Build & IDE
+node_modules/
+vendor/
+.idea/
+.vscode/
+.DS_Store
+
+# System
+Thumbs.db
+
+# Logs & temp
+*.log
