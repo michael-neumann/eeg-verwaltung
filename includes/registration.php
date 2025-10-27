@@ -47,8 +47,8 @@ function eeg_verw_register_shortcode($atts = []){
                     'role' => 'mitglied'
                 ]);
                 global $wpdb;
-                $table = eeg_verw_table();
-                $member_no = eeg_verw_generate_member_no($user_id);
+                $table = eeg_verw_table_mitglieder();
+                $member_no = eeg_verw_get_mitgliedsnummer($user_id);
                 $ip = function_exists('eeg_verw_get_client_ip') ? eeg_verw_get_client_ip() : ($_SERVER['REMOTE_ADDR'] ?? '');
                 $now = current_time('mysql');
                 $ip_bin = function_exists('inet_pton') ? (inet_pton($ip) ?: null) : null;

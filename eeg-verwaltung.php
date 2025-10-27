@@ -39,7 +39,7 @@ add_action('plugins_loaded', function () {
         'includes/registration.php',
         'includes/content-protection.php',
         'includes/menu-guard.php',
-        'includes/admin/members-page.php',
+        'includes/admin/Mitgliederliste.php',
         'includes/downloads.php',
         'includes/utils/security.php',
     ]);

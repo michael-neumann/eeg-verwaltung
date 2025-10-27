@@ -1,16 +1,22 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
 
-function eeg_verw_admin_members_bootstrap(){
+function eeg_verw_admin_mitgliederliste_bootstrap(){
     add_action('admin_menu', function(){
-        add_users_page(__('Verwaltungsliste','eeg-verwaltung'), __('Verwaltungsliste','eeg-verwaltung'), 'list_users', 'eeg-verwaltungsliste', 'eeg_verw_render_mgmt');
+        add_users_page(
+            __('Mitgliederliste','eeg-verwaltung'),
+            __('Mitgliederliste','eeg-verwaltung'),
+            'list_users',
+            'eeg-Mitgliederliste',
+            'eeg_verw_render_mgmt'
+        );
     });
 }
 
 function eeg_verw_render_mgmt(){
     if (!current_user_can('list_users')) wp_die('Kein Zugriff.');
     global $wpdb;
-    $table = eeg_verw_table();
+    $table = eeg_verw_table_mitglieder();
 
     if (isset($_POST['eeg_verw_mgmt_nonce']) && wp_verify_nonce($_POST['eeg_verw_mgmt_nonce'], 'eeg_verw_mgmt')){
         $uid = intval($_POST['user_id'] ?? 0);
