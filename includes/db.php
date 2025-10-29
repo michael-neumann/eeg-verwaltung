@@ -36,13 +36,11 @@ function eeg_verw_install_db(){
     $sql1 = "CREATE TABLE {$table_mitglieder} (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         user_id BIGINT UNSIGNED NOT NULL,
-        member_no BIGINT UNSIGNED NOT NULL,
+        mitgliedsnummer BIGINT UNSIGNED NOT NULL,
         mitgliedsart_id BIGINT UNSIGNED NOT NULL,
-        titel_vor VARCHAR(40) NULL,
-        titel_nach VARCHAR(40) NULL,
         vorname VARCHAR(100) NULL,
         nachname VARCHAR(100) NULL,
-        company VARCHAR(100) NULL, 
+        firma VARCHAR(100) NULL, 
         strasse VARCHAR(100) NULL,
         hausnummer VARCHAR(40) NULL,
         plz VARCHAR(10) NULL,
@@ -60,15 +58,16 @@ function eeg_verw_install_db(){
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
         PRIMARY KEY (id),
-        UNIQUE KEY uq_member_no (member_no),
+        UNIQUE KEY uq_mitgliedsnummer (mitgliedsnummer),
         UNIQUE KEY uq_user (user_id),
         KEY idx_status (status)
     ) {$charset};";
 
     // Sequenz-Tabelle für Mitgliedernummer
     $sql2 = "CREATE TABLE {$table_mitglieder_sequence} (
-        counter_key VARCHAR(50) PRIMARY KEY,
-        current_value BIGINT UNSIGNED NOT NULL DEFAULT 0
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id)
     ) {$charset};";
 
     // Tabelle für Mitgliedsarten
@@ -76,7 +75,7 @@ function eeg_verw_install_db(){
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         bezeichnung VARCHAR(100) NOT NULL,
         eeg_faktura_tarif_bezug VARCHAR(100) NOT NULL,
-        eeg_faktura_tarif_einspeisung VARCHAR(100) NOT NULL
+        eeg_faktura_tarif_einspeisung VARCHAR(100) NOT NULL, 
         PRIMARY KEY (id)
     ) {$charset};";
 
@@ -98,7 +97,6 @@ function eeg_verw_install_db(){
         gerichtsstand VARCHAR(100) NULL,
         eeg_faktura_benutzer VARCHAR(100) NULL,
         eeg_faktura_passwort VARCHAR(100) NULL,
-        
         PRIMARY KEY (id)
     ) {$charset};";
 
@@ -110,19 +108,9 @@ function eeg_verw_install_db(){
     add_option('eeg_verw_db_version', '1.0');
 }
 
-function eeg_verw_get_mitgliedsnummer($user_id){
+function eeg_verw_get_mitgliedsnummer(){
     global $wpdb;
-    $key = 'mitgliedsnummer';
     $table = eeg_verw_table_mitglieder_sequence();
-
-    // atomar: increment in einem Statement
-    $wpdb->query(
-        $wpdb->prepare(
-            "INSERT INTO $table (counter_key, current_value)
-             VALUES (%s, 1)
-             ON DUPLICATE KEY UPDATE current_value = LAST_INSERT_ID(current_value + 1)",
-            $key
-        )
-    );
-    return (int) $wpdb->get_var("SELECT LAST_INSERT_ID()");
+    $wpdb->query( "INSERT INTO {$table} () VALUES ()" );
+    return (int) $wpdb->insert_id;
 }
