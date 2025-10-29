@@ -40,7 +40,34 @@ add_action('plugins_loaded', function () {
         'includes/content-protection.php',
         'includes/menu-guard.php',
         'includes/admin/Mitgliederliste.php',
+        'includes/admin/Mitgliedsarten.php',
         'includes/downloads.php',
         'includes/utils/security.php',
     ]);
 });
+
+
+add_action('admin_menu', function () {
+    add_menu_page(
+        'EEG Verwaltung',
+        'EEG',
+        'manage_options',
+        'eeg-admin',
+        'eeg_verw_admin_welcome',
+        'dashicons-groups',
+        45
+    );
+
+    add_submenu_page(
+        'eeg-admin',
+        'Mitgliedsarten',
+        'Mitgliedsarten',
+        'manage_options',
+        'eeg-mitgliedsarten',
+        'eeg_verw_admin_mitgliedsarten_page'
+    );
+});
+
+function eeg_verw_admin_welcome() {
+    echo '<div class="wrap"><h1>EEG Verwaltung</h1><p>Wähle eine Funktion im Menü.</p></div>';
+}

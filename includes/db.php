@@ -27,6 +27,7 @@ function eeg_verw_install_db(){
     global $wpdb;
     $table_mitglieder = eeg_verw_table_mitglieder();
     $table_mitglieder_sequence = eeg_verw_table_mitglieder_sequence();
+    $table_mitgliedsarten = eeg_verw_table_mitgliedsarten();
     $table_einstellungen = eeg_verw_table_einstellungen();
     $charset = $wpdb->get_charset_collate();
 
@@ -71,7 +72,7 @@ function eeg_verw_install_db(){
     ) {$charset};";
 
     // Tabelle für Mitgliedsarten
-    $sql3 = "CREATE TABLE {$table_mitglieder_sequence} (
+    $sql3 = "CREATE TABLE {$table_mitgliedsarten} (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         bezeichnung VARCHAR(100) NOT NULL,
         eeg_faktura_tarif_bezug VARCHAR(100) NOT NULL,
