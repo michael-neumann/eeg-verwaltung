@@ -13,7 +13,7 @@ function eeg_verw_admin_mitgliederliste_bootstrap(){
     });
 }
 
-function eeg_verw_render_mgmt(){
+function eeg_verw_admin_mitgliederliste(){
     if (!current_user_can('list_users')) wp_die('Kein Zugriff.');
     global $wpdb;
     $table = eeg_verw_table_mitglieder();

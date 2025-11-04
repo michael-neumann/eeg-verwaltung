@@ -60,6 +60,15 @@ add_action('admin_menu', function () {
 
     add_submenu_page(
         'eeg-admin',
+        'Mitgliederliste',
+        'Mitgliederliste',
+        'manage_options',
+        'eeg-mitgliederliste',
+        'eeg_verw_admin_mitgliederliste'
+    );
+
+    add_submenu_page(
+        'eeg-admin',
         'Mitgliedsarten',
         'Mitgliedsarten',
         'manage_options',

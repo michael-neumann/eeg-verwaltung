@@ -12,7 +12,6 @@ final class Loader {
         if (function_exists('eeg_verw_registration_bootstrap')) eeg_verw_registration_bootstrap();
         if (function_exists('eeg_verw_content_protection_bootstrap')) eeg_verw_content_protection_bootstrap();
         if (function_exists('eeg_verw_menu_guard_bootstrap')) eeg_verw_menu_guard_bootstrap();
-        if (function_exists('eeg_verw_admin_mitgliederliste_bootstrap')) eeg_verw_admin_mitgliederliste_bootstrap();
         if (function_exists('eeg_verw_downloads_bootstrap')) eeg_verw_downloads_bootstrap();
         if (function_exists('eeg_verw_utils_security_bootstrap')) eeg_verw_utils_security_bootstrap();
     }
