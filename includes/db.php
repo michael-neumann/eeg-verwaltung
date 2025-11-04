@@ -74,10 +74,14 @@ function eeg_verw_install_db(){
     // Tabelle für Mitgliedsarten
     $sql3 = "CREATE TABLE {$table_mitgliedsarten} (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        sort_order INT UNSIGNED NOT NULL DEFAULT 0,
         bezeichnung VARCHAR(100) NOT NULL,
         eeg_faktura_tarif_bezug VARCHAR(100) NOT NULL,
-        eeg_faktura_tarif_einspeisung VARCHAR(100) NOT NULL, 
-        PRIMARY KEY (id)
+        eeg_faktura_tarif_einspeisung VARCHAR(100) NOT NULL,
+        aktiv TINYINT(1) NOT NULL DEFAULT 1,
+        PRIMARY KEY (id),
+        KEY aktiv (aktiv),
+        KEY bezeichnung (bezeichnung)
     ) {$charset};";
 
     // Tabelle für EEG Einstellungen
@@ -106,8 +110,10 @@ function eeg_verw_install_db(){
     dbDelta($sql3);
     dbDelta($sql4);
 
-    add_option('eeg_verw_db_version', '1.0');
+    add_option('eeg_verw_db_version', '1.2');
 }
+
+
 
 function eeg_verw_get_mitgliedsnummer(){
     global $wpdb;

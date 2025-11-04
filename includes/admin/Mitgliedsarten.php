@@ -15,16 +15,20 @@ function eeg_verw_admin_mitgliedsarten_page() {
     // CREATE / UPDATE
     if (in_array($action, ['create','update'], true) && wp_verify_nonce($nonce, 'eeg_ms_save')) {
         $id   = isset($_POST['id']) ? absint($_POST['id']) : 0;
+        $sort_order = isset($_POST['sort_order']) ? max(0, (int)$_POST['sort_order']) : 0;
         $bez  = isset($_POST['bezeichnung']) ? sanitize_text_field($_POST['bezeichnung']) : '';
         $tarB = isset($_POST['eeg_faktura_tarif_bezug']) ? sanitize_text_field($_POST['eeg_faktura_tarif_bezug']) : '';
         $tarE = isset($_POST['eeg_faktura_tarif_einspeisung']) ? sanitize_text_field($_POST['eeg_faktura_tarif_einspeisung']) : '';
+        $aktiv = isset($_POST['aktiv']) ? 1 : 0;
 
         $data = [
+            'sort_order' => $sort_order,
             'bezeichnung' => $bez,
             'eeg_faktura_tarif_bezug' => $tarB,
             'eeg_faktura_tarif_einspeisung' => $tarE,
+            'aktiv' => $aktiv,
         ];
-        $format = ['%s','%s','%s'];
+        $format = ['%d','%s','%s','%s','%d'];
 
         if ($action === 'create') {
             $wpdb->insert($table, $data, $format);
@@ -33,6 +37,15 @@ function eeg_verw_admin_mitgliedsarten_page() {
             $wpdb->update($table, $data, ['id' => $id], $format, ['%d']);
             echo '<div class="updated notice"><p>Mitgliedsart aktualisiert.</p></div>';
         }
+
+        if ($action === 'toggle_active' && wp_verify_nonce($nonce, 'eeg_ms_toggle')) {
+            $id = absint($_GET['id'] ?? 0);
+            if ($id) {
+                $current = (int) $wpdb->get_var($wpdb->prepare("SELECT aktiv FROM {$table} WHERE id=%d", $id));
+                $wpdb->update($table, ['aktiv' => $current ? 0 : 1], ['id'=>$id], ['%d'], ['%d']);
+            }
+        }
+
     }
 
     // DELETE
@@ -54,7 +67,11 @@ function eeg_verw_admin_mitgliedsarten_page() {
     }
 
     // Liste
-    $items = $wpdb->get_results("SELECT * FROM {$table} ORDER BY bezeichnung ASC");
+    $items = $wpdb->get_results("
+    SELECT *
+    FROM {$table} 
+    ORDER BY aktiv DESC, sort_order ASC, bezeichnung ASC
+");
     ?>
     <div class="wrap">
         <h1 class="wp-heading-inline">Mitgliedsarten</h1>
@@ -75,16 +92,25 @@ function eeg_verw_admin_mitgliedsarten_page() {
                 <table class="form-table" role="presentation">
                     <tbody>
                     <tr>
+                        <th><label for="sort_order">Priorität</label></th>
+                        <td><label><input name="sort_order" type="number" id="sort_order" class="small-text" min="0" step="1"
+                                   value="<?php echo esc_attr($is_edit ? (int)$edit_item->sort_order : 0); ?>"> Sortierung in der Anzeige</label></td>
+                    </tr>
+                    <tr>
                         <th><label for="bezeichnung">Bezeichnung *</label></th>
                         <td><input name="bezeichnung" type="text" id="bezeichnung" class="regular-text" required value="<?php echo esc_attr($is_edit ? $edit_item->bezeichnung : ''); ?>"></td>
                     </tr>
                     <tr>
                         <th><label for="eeg_faktura_tarif_bezug">Faktura Tarif Bezug</label></th>
-                        <td><input name="eeg_faktura_tarif_bezug" type="text" id="eeg_faktura_tarif_bezug" class="regular-text" value="<?php echo esc_attr($is_edit ? $edit_item->eeg_faktura_tarif_bezug : ''); ?>"></td>
+                        <td><label><input name="eeg_faktura_tarif_bezug" type="text" id="eeg_faktura_tarif_bezug" class="regular-text" value="<?php echo esc_attr($is_edit ? $edit_item->eeg_faktura_tarif_bezug : ''); ?>"> Name des Bezugstarif in der EEG Faktura</label></td>
                     </tr>
                     <tr>
                         <th><label for="eeg_faktura_tarif_einspeisung">Faktura Tarif Einspeisung</label></th>
-                        <td><input name="eeg_faktura_tarif_einspeisung" type="text" id="eeg_faktura_tarif_einspeisung" class="regular-text" value="<?php echo esc_attr($is_edit ? $edit_item->eeg_faktura_tarif_einspeisung : ''); ?>"></td>
+                        <td><label><input name="eeg_faktura_tarif_einspeisung" type="text" id="eeg_faktura_tarif_einspeisung" class="regular-text" value="<?php echo esc_attr($is_edit ? $edit_item->eeg_faktura_tarif_einspeisung : ''); ?>"> Name des Einspeisetarif in der EEG Faktura</label></td>
+                    </tr>
+                    <tr>
+                        <th><label for="aktiv">Aktiv</label></th>
+                        <td><label><input type="checkbox" name="aktiv" id="aktiv" <?php checked($is_edit ? (int)$edit_item->aktiv : 1, 1); ?>> sichtbar/auswählbar</label></td>
                     </tr>
                     </tbody>
                 </table>
@@ -98,9 +124,11 @@ function eeg_verw_admin_mitgliedsarten_page() {
                 <thead>
                 <tr>
                     <th style="width:70px;">ID</th>
+                    <th>Priorität</th>
                     <th>Bezeichnung</th>
                     <th>Tarif Bezug</th>
                     <th>Tarif Einspeisung</th>
+                    <th>Aktiv</th>
                     <th style="width:180px;">Aktionen</th>
                 </tr>
                 </thead>
@@ -108,9 +136,17 @@ function eeg_verw_admin_mitgliedsarten_page() {
                 <?php if ($items): foreach ($items as $row): ?>
                     <tr>
                         <td><?php echo (int)$row->id; ?></td>
+                        <td><?php echo (int)$row->sort_order; ?></td>
                         <td><?php echo esc_html($row->bezeichnung); ?></td>
                         <td><?php echo esc_html($row->eeg_faktura_tarif_bezug); ?></td>
                         <td><?php echo esc_html($row->eeg_faktura_tarif_einspeisung); ?></td>
+                        <td><?php echo (int)$row->aktiv; ?>
+                            <a class="button button-small" href="<?php
+                            echo wp_nonce_url(add_query_arg(['page'=>'eeg-mitgliedsarten','action'=>'toggle_active','id'=>$row->id]), 'eeg_ms_toggle');
+                            ?>">
+                                <?php echo $row->aktiv ? 'Deaktivieren' : 'Aktivieren'; ?>
+                            </a>
+                        </td>
                         <td>
                             <a class="button button-small" href="<?php echo esc_url(add_query_arg(['page'=>'eeg-mitgliedsarten','action'=>'edit','id'=>$row->id])); ?>">Bearbeiten</a>
                             <a class="button button-small button-link-delete" href="<?php echo wp_nonce_url(add_query_arg(['page'=>'eeg-mitgliedsarten','action'=>'delete','id'=>$row->id]), 'eeg_ms_delete'); ?>" onclick="return confirm('Diese Mitgliedsart wirklich löschen?');">Löschen</a>
