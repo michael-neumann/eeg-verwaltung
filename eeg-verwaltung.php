@@ -64,7 +64,7 @@ add_action('admin_menu', function () {
         'Mitgliederliste',
         'manage_options',
         'eeg-mitgliederliste',
-        'eeg_verw_admin_mitgliederliste'
+        'eeg_verw_admin_mitglieder_page'
     );
 
     add_submenu_page(
@@ -80,3 +80,11 @@ add_action('admin_menu', function () {
 function eeg_verw_admin_welcome() {
     echo '<div class="wrap"><h1>EEG Verwaltung</h1><p>Wähle eine Funktion im Menü.</p></div>';
 }
+
+# Wenn ein Benutzer gelöscht wird auch das Mitglied löschen
+add_action('deleted_user', function($user_id) {
+    global $wpdb;
+    $table = eeg_verw_table_mitglieder();
+    // falls du 1:1-Beziehung hast:
+    $wpdb->delete($table, ['user_id' => (int)$user_id], ['%d']);
+}, 10, 1);
