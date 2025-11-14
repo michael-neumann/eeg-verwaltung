@@ -9,7 +9,6 @@ if (!class_exists('WP_List_Table')) {
 }
 
 
-
 /**
  * List Table
  */
@@ -748,8 +747,51 @@ function eeg_verw_render_mitglied_form($id = 0)
         }
     }
 
+    if (
+            $_SERVER['REQUEST_METHOD'] === 'POST'
+            && isset($_POST['eeg_action'])
+            && $_POST['eeg_action'] === 'save'
+    ) {
+        // einfache Liste der Formularfelder, die zurückgeschrieben werden sollen
+        $fields = [
+                'mitgliedsnummer',
+                'mitgliedsart_id',
+                'firma',
+                'vorname',
+                'nachname',
+                'strasse',
+                'hausnummer',
+                'plz',
+                'ort',
+                'telefonnummer',
+                'email',
+                'uid',
+                'dokumentenart',
+                'dokumentennummer',
+                'iban',
+                'kontoinhaber',
+        ];
+
+        foreach ($fields as $field) {
+            if (isset($_POST[$field])) {
+                if ($field === 'mitgliedsart_id') {
+                    $row[$field] = (int)$_POST[$field];
+                } else {
+                    $row[$field] = sanitize_text_field(wp_unslash($_POST[$field]));
+                }
+            }
+        }
+
+        // Checkbox/Status-Felder
+        if (isset($_POST['status'])) {
+            $row['status'] = (int)$_POST['status'];
+        }
+
+        $row['aktiv'] = isset($_POST['aktiv']) ? 1 : 0;
+    }
+
     $arten = $wpdb->get_results(
-            "SELECT id, bezeichnung FROM {$table_a} WHERE aktiv = 1 ORDER BY sort_order ASC",
+            "SELECT id, bezeichnung, uid_pflicht, firmenname_pflicht FROM {$table_a} WHERE aktiv = 1 ORDER BY sort_order ASC",
             ARRAY_A
     );
 
@@ -865,8 +907,8 @@ function eeg_verw_render_mitglied_form($id = 0)
                     <td>
                         <input name="plz" id="plz" type="text" class="small-text"
                                value="<?php echo esc_attr($row['plz']); ?>" required/>
-                    <input name="ort" id="ort" type="text" class="regular-text"
-                           value="<?php echo esc_attr($row['ort']); ?>" required/>
+                        <input name="ort" id="ort" type="text" class="regular-text"
+                               value="<?php echo esc_attr($row['ort']); ?>" required/>
                     </td>
                 </tr>
 
