@@ -79,6 +79,8 @@ function eeg_verw_install_db(){
         bezeichnung VARCHAR(100) NOT NULL,
         eeg_faktura_tarif_bezug VARCHAR(100) NOT NULL,
         eeg_faktura_tarif_einspeisung VARCHAR(100) NOT NULL,
+        uid_pflicht TINYINT(1) NOT NULL DEFAULT 0,
+        firmenname_pflicht TINYINT(1) NOT NULL DEFAULT 0,
         aktiv TINYINT(1) NOT NULL DEFAULT 1,
         PRIMARY KEY (id),
         KEY aktiv (aktiv),
@@ -111,7 +113,7 @@ function eeg_verw_install_db(){
     dbDelta($sql3);
     dbDelta($sql4);
 
-    add_option('eeg_verw_db_version', '1.3');
+    add_option('eeg_verw_db_version', '1.4');
 }
 
 

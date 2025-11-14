@@ -43,6 +43,7 @@ add_action('plugins_loaded', function () {
         'includes/admin/Mitgliedsarten.php',
         'includes/downloads.php',
         'includes/utils/security.php',
+        'includes/utils/iban_checker.php',
     ]);
 });
 
