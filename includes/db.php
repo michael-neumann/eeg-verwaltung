@@ -61,6 +61,7 @@ function eeg_verw_install_db(){
         aktiv TINYINT(1) NOT NULL DEFAULT 1,
         PRIMARY KEY (id),
         UNIQUE KEY uq_mitgliedsnummer (mitgliedsnummer),
+        UNIQUE KEY uq_email (email),
         UNIQUE KEY uq_user (user_id),
         KEY idx_status (status)
     ) {$charset};";
@@ -113,7 +114,7 @@ function eeg_verw_install_db(){
     dbDelta($sql3);
     dbDelta($sql4);
 
-    add_option('eeg_verw_db_version', '1.4');
+    add_option('eeg_verw_db_version', '1.5');
 }
 
 

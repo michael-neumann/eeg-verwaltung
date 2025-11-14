@@ -541,6 +541,23 @@ function eeg_verw_handle_mitglieder_actions()
             $iban = strtoupper($iban_clean);
         }
 
+        // Email prüfen
+        $exists_email = $wpdb->get_var(
+                $wpdb->prepare("SELECT COUNT(*) FROM $table WHERE email = %s", $email)
+        );
+
+        if ($exists_email) {
+            add_settings_error(
+                    'eeg_mitglieder',
+                    'duplicate_email',
+                    __('Diese E-Mail-Adresse existiert bereits!', 'eeg-verwaltung'),
+                    'error'
+            );
+            $_GET['action'] = 'edit';
+            $_GET['id'] = $edit_id;
+            return;
+        }
+
         $mitgliedsnummer = sanitize_text_field($_POST['mitgliedsnummer'] ?? '');
         if ($mitgliedsnummer === '' && function_exists('eeg_verw_get_mitgliedsnummer')) {
             $mitgliedsnummer = (string)eeg_verw_get_mitgliedsnummer(0);
@@ -676,6 +693,23 @@ function eeg_verw_handle_mitglieder_actions()
         if (!empty($user_id)) {
             $data['user_id'] = (int)$user_id;
             $formats[] = '%d';
+        }
+
+        // User-ID prüfen
+        $exists_uid = $wpdb->get_var(
+                $wpdb->prepare("SELECT COUNT(*) FROM $table WHERE user_id = %d", $user_id)
+        );
+
+        if ($exists_uid) {
+            add_settings_error(
+                    'eeg_mitglieder',
+                    'duplicate_user',
+                    __('Dieser Benutzer ist bereits verknüpft.', 'eeg-verwaltung'),
+                    'error'
+            );
+            $_GET['action'] = 'edit';
+            $_GET['id'] = $edit_id;
+            return;
         }
 
         $ok = $wpdb->insert($table, $data, $formats);
@@ -814,6 +848,12 @@ function eeg_verw_render_mitglied_form($id = 0)
 
         <?php settings_errors('eeg_mitglieder'); ?>
 
+        <style>
+            #row_firma,
+            #row_uid {
+                display: none;
+            }
+        </style>
         <form method="post" action="">
             <?php
             wp_nonce_field('eeg_mitglied_edit');
@@ -843,26 +883,48 @@ function eeg_verw_render_mitglied_form($id = 0)
                     </th>
                     <td>
                         <select name="mitgliedsart_id" id="mitgliedsart_id">
-                            <?php
-                            if (is_array($arten)) {
-                                foreach ($arten as $art) {
-                                    echo '<option value="' . (int)$art['id'] . '"';
-                                    selected((int)$row['mitgliedsart_id'], (int)$art['id']);
-                                    echo '>' . esc_html($art['bezeichnung']) . '</option>';
-                                }
-                            }
-                            ?>
+                            <?php foreach ($arten as $art) : ?>
+                                <option
+                                        value="<?php echo esc_attr($art['id']); ?>"
+                                        data-uid-pflicht="<?php echo (int)$art['uid_pflicht']; ?>"
+                                        data-firmenname-pflicht="<?php echo (int)$art['firmenname_pflicht']; ?>"
+                                        <?php selected($row['mitgliedsart_id'], $art['id']); ?>
+                                >
+                                    <?php echo esc_html($art['bezeichnung']); ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
+
                     </td>
                 </tr>
 
-                <tr>
+                <tr class="form-field" id="row_firma">
                     <th scope="row">
-                        <label for="firma"><?php esc_html_e('Firma', 'eeg-verwaltung'); ?></label>
+                        <label for="firma"><?php _e('Firmenname', 'eeg-verwaltung'); ?></label>
                     </th>
                     <td>
-                        <input name="firma" id="firma" type="text" class="regular-text"
-                               value="<?php echo esc_attr($row['firma']); ?>"/>
+                        <input
+                                name="firma"
+                                id="firma"
+                                type="text"
+                                class="regular-text"
+                                value="<?php echo esc_attr($row['firma']); ?>"
+                        />
+                    </td>
+                </tr>
+
+                <tr class="form-field" id="row_uid">
+                    <th scope="row">
+                        <label for="uid"><?php _e('UID', 'eeg-verwaltung'); ?></label>
+                    </th>
+                    <td>
+                        <input
+                                name="uid"
+                                id="uid"
+                                type="text"
+                                class="regular-text"
+                                value="<?php echo esc_attr($row['uid']); ?>"
+                        />
                     </td>
                 </tr>
 
@@ -942,16 +1004,6 @@ function eeg_verw_render_mitglied_form($id = 0)
                         <p class="description">
                             <?php esc_html_e('Wird als Benutzername, zur Kommunikation und Rechnsungsversand verwendet.', 'eeg-verwaltung'); ?>
                         </p>
-                    </td>
-                </tr>
-
-                <tr>
-                    <th scope="row">
-                        <label for="uid"><?php esc_html_e('UID', 'eeg-verwaltung'); ?></label>
-                    </th>
-                    <td>
-                        <input name="uid" id="uid" type="text" class="regular-text"
-                               value="<?php echo esc_attr($row['uid']); ?>"/>
                     </td>
                 </tr>
 
@@ -1085,12 +1137,14 @@ function eeg_verw_render_mitglied_form($id = 0)
 
                 IMask(phoneInput, {
                     mask: '+00000000000000000000',
-                    lazy: false,
+                    lazy: true,
+                    placeholderChar: '',   // <<< Unterstriche deaktiviert
                     definitions: {
                         '0': /[0-9 ]/ // Ziffern oder Leerzeichen
                     }
                 });
             }
+
 
             // E-Mail: keine Leerzeichen, sehr lockere Maske (alles außer Space, optional @)
             var emailInput = document.getElementById('email');
@@ -1100,6 +1154,52 @@ function eeg_verw_render_mitglied_form($id = 0)
                 });
             }
         });
+    </script>
+
+    <!-- Firmenfelder einblenden bei bedarf -->
+    <script type="text/javascript">
+        (function ($) {
+
+            function updateFirmaUidVisibility() {
+                var $select = $('#mitgliedsart_id');
+                if ($select.length === 0) {
+                    return;
+                }
+
+                var $selected = $select.find('option:selected');
+                var uidPflicht = parseInt($selected.data('uid-pflicht'), 10) === 1;
+                var firmennamePflicht = parseInt($selected.data('firmenname-pflicht'), 10) === 1;
+
+                var $rowFirma = $('#row_firma');
+                var $rowUid = $('#row_uid');
+                var $inputFirma = $('#firma');
+                var $inputUid = $('#uid');
+
+                // Firmenname
+                if (firmennamePflicht) {
+                    $rowFirma.show();
+                    $inputFirma.prop('required', true);
+                } else {
+                    $rowFirma.hide();
+                    $inputFirma.prop('required', false).val('');
+                }
+
+                // UID
+                if (uidPflicht) {
+                    $rowUid.show();
+                    $inputUid.prop('required', true);
+                } else {
+                    $rowUid.hide();
+                    $inputUid.prop('required', false).val('');
+                }
+            }
+
+            $(document).ready(function () {
+                $('#mitgliedsart_id').on('change', updateFirmaUidVisibility);
+                updateFirmaUidVisibility(); // Initialzustand
+            });
+
+        })(jQuery);
     </script>
 
     <?php
