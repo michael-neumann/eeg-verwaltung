@@ -54,7 +54,7 @@ function eeg_verw_install_db(){
         iban VARCHAR(40) NULL,
         kontoinhaber VARCHAR(40) NULL,
         consent_at DATETIME NULL,
-        consent_ip VARBINARY(16) NULL,
+        consent_ip VARCHAR(45) NULL,
         status TINYINT UNSIGNED NOT NULL DEFAULT 1,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
@@ -114,7 +114,7 @@ function eeg_verw_install_db(){
     dbDelta($sql3);
     dbDelta($sql4);
 
-    add_option('eeg_verw_db_version', '1.5');
+    add_option('eeg_verw_db_version', '1.6');
 }
 
 
