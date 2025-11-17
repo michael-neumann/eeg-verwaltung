@@ -6,10 +6,10 @@ require_once ABSPATH . 'wp-admin/includes/user.php';
 
 function eeg_verw_registration_bootstrap()
 {
-    add_shortcode('eeg_verw_register', 'eeg_verw_register_shortcode');
+    add_shortcode('eeg_register', 'eeg_register_shortcode');
 }
 
-function eeg_verw_register_shortcode($atts = [])
+function eeg_register_shortcode($atts = [])
 {
     if (is_user_logged_in()) {
         return '<p>' . esc_html__('Du bist bereits angemeldet.', 'eeg-verwaltung') . '</p>';

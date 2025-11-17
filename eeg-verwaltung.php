@@ -44,6 +44,7 @@ add_action('plugins_loaded', function () {
         'includes/downloads.php',
         'includes/utils/security.php',
         'includes/utils/iban_checker.php',
+        'includes/meine-daten.php',
     ]);
 });
 
@@ -89,3 +90,6 @@ add_action('deleted_user', function($user_id) {
     // falls du 1:1-Beziehung hast:
     $wpdb->delete($table, ['user_id' => (int)$user_id], ['%d']);
 }, 10, 1);
+
+
+
