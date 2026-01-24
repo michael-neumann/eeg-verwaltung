@@ -356,6 +356,134 @@ class EEG_Verw_Mitglieder_List_Table extends WP_List_Table
     }
 }
 
+function eeg_verw_sanitize_zaehlpunkt_field($value)
+{
+    if ($value === null) {
+        return '';
+    }
+    return sanitize_text_field(wp_unslash($value));
+}
+
+function eeg_verw_prepare_zaehlpunkte_from_request($raw_rows)
+{
+    $rows = [];
+    if (!is_array($raw_rows)) {
+        return $rows;
+    }
+
+    $fields = [
+            'zaehlpunkt',
+            'zp_status',
+            'zp_nr',
+            'zaehlpunktname',
+            'registriert',
+            'bezugsrichtung',
+            'teilnahme_fkt',
+            'wechselrichter_nr',
+            'plz',
+            'ort',
+            'strasse',
+            'hausnummer',
+            'aktiviert',
+            'deaktiviert',
+            'tarifname',
+            'umspannwerk',
+    ];
+
+    foreach ($raw_rows as $raw_row) {
+        if (!is_array($raw_row)) {
+            continue;
+        }
+
+        $row = [];
+        $has_value = false;
+        foreach ($fields as $field) {
+            $value = '';
+            if (array_key_exists($field, $raw_row)) {
+                $value = eeg_verw_sanitize_zaehlpunkt_field($raw_row[$field]);
+            }
+            if ($value !== '') {
+                $has_value = true;
+            }
+            $row[$field] = $value;
+        }
+
+        if ($has_value) {
+            $rows[] = $row;
+        }
+    }
+
+    return $rows;
+}
+
+function eeg_verw_save_mitglied_zaehlpunkte($mitglied_id, $rows)
+{
+    global $wpdb;
+    $table_zp = eeg_verw_table_zaehlpunkte();
+
+    $mitglied_id = (int)$mitglied_id;
+    if ($mitglied_id <= 0) {
+        return;
+    }
+
+    $wpdb->delete($table_zp, ['mitglied_id' => $mitglied_id], ['%d']);
+
+    if (empty($rows)) {
+        return;
+    }
+
+    $now = current_time('mysql');
+    foreach ($rows as $row) {
+        $data = [
+                'mitglied_id' => $mitglied_id,
+                'zaehlpunkt' => $row['zaehlpunkt'],
+                'zp_status' => $row['zp_status'],
+                'zp_nr' => $row['zp_nr'],
+                'zaehlpunktname' => $row['zaehlpunktname'],
+                'registriert' => $row['registriert'] !== '' ? $row['registriert'] : null,
+                'bezugsrichtung' => $row['bezugsrichtung'],
+                'teilnahme_fkt' => $row['teilnahme_fkt'],
+                'wechselrichter_nr' => $row['wechselrichter_nr'],
+                'plz' => $row['plz'],
+                'ort' => $row['ort'],
+                'strasse' => $row['strasse'],
+                'hausnummer' => $row['hausnummer'],
+                'aktiviert' => $row['aktiviert'] !== '' ? $row['aktiviert'] : null,
+                'deaktiviert' => $row['deaktiviert'] !== '' ? $row['deaktiviert'] : null,
+                'tarifname' => $row['tarifname'],
+                'umspannwerk' => $row['umspannwerk'],
+                'created_at' => $now,
+                'updated_at' => $now,
+        ];
+
+        $wpdb->insert(
+                $table_zp,
+                $data,
+                [
+                        '%d',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                        '%s',
+                ]
+        );
+    }
+}
+
 /**
  * Aktionen (vor Ausgabe) verarbeiten
  */
@@ -521,6 +649,7 @@ function eeg_verw_handle_mitglieder_actions()
         $kontoinhaber = sanitize_text_field($_POST['kontoinhaber'] ?? '');
         $status = isset($_POST['status']) ? (int)$_POST['status'] : 1;
         $aktiv = isset($_POST['aktiv']) ? 1 : 0;
+        $zaehlpunkte_rows = eeg_verw_prepare_zaehlpunkte_from_request($_POST['zaehlpunkte'] ?? []);
 
         // IBAN prüfen
         if ($iban !== '') {
@@ -627,6 +756,7 @@ function eeg_verw_handle_mitglieder_actions()
             $ok = $wpdb->update($table, $data, ['id' => $edit_id], $formats, ['%d']);
 
             if ($ok !== false) {
+                eeg_verw_save_mitglied_zaehlpunkte($edit_id, $zaehlpunkte_rows);
                 add_settings_error(
                         'eeg_mitglieder',
                         'updated',
@@ -715,6 +845,8 @@ function eeg_verw_handle_mitglieder_actions()
         $ok = $wpdb->insert($table, $data, $formats);
 
         if ($ok) {
+            $mitglied_id = (int)$wpdb->insert_id;
+            eeg_verw_save_mitglied_zaehlpunkte($mitglied_id, $zaehlpunkte_rows);
             add_settings_error(
                     'eeg_mitglieder',
                     'created',
@@ -751,6 +883,7 @@ function eeg_verw_render_mitglied_form($id = 0)
     global $wpdb;
     $table_m = eeg_verw_table_mitglieder();
     $table_a = eeg_verw_table_mitgliedsarten();
+    $table_zp = eeg_verw_table_zaehlpunkte();
 
     $row = [
             'id' => 0,
@@ -779,6 +912,36 @@ function eeg_verw_render_mitglied_form($id = 0)
         if (is_array($found)) {
             $row = array_merge($row, $found);
         }
+    }
+
+    $zaehlpunkte = [];
+    if (!empty($id)) {
+        $zaehlpunkte = $wpdb->get_results(
+                $wpdb->prepare("SELECT * FROM {$table_zp} WHERE mitglied_id = %d ORDER BY id ASC", $id),
+                ARRAY_A
+        );
+    }
+    if (empty($zaehlpunkte)) {
+        $zaehlpunkte = [
+                [
+                        'zaehlpunkt' => '',
+                        'zp_status' => '',
+                        'zp_nr' => '',
+                        'zaehlpunktname' => '',
+                        'registriert' => '',
+                        'bezugsrichtung' => '',
+                        'teilnahme_fkt' => '',
+                        'wechselrichter_nr' => '',
+                        'plz' => '',
+                        'ort' => '',
+                        'strasse' => '',
+                        'hausnummer' => '',
+                        'aktiviert' => '',
+                        'deaktiviert' => '',
+                        'tarifname' => '',
+                        'umspannwerk' => '',
+                ],
+        ];
     }
 
     if (
@@ -1072,6 +1235,171 @@ function eeg_verw_render_mitglied_form($id = 0)
 
                 <tr>
                     <th scope="row">
+                        <?php esc_html_e('Zählpunkte', 'eeg-verwaltung'); ?>
+                    </th>
+                    <td>
+                        <table class="widefat striped" id="eeg-zaehlpunkte-table">
+                            <thead>
+                            <tr>
+                                <th><?php esc_html_e('Zählpunkt', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('ZP-Status', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('ZpNr.', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('Zählpunktname', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('Registriert', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('Bezugsrichtung', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('Teilnahme Fkt.', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('WechselrichterNr.', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('PLZ', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('Ort', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('Straße', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('HausNr.', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('Aktiviert', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('Deaktiviert', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('Zp. Tarifname', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('Umspannwerk', 'eeg-verwaltung'); ?></th>
+                                <th><?php esc_html_e('Aktion', 'eeg-verwaltung'); ?></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <?php foreach ($zaehlpunkte as $index => $zaehlpunkt_row) : ?>
+                                <tr>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][zaehlpunkt]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['zaehlpunkt'] ?? ''); ?>"
+                                               class="regular-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][zp_status]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['zp_status'] ?? ''); ?>"
+                                               class="regular-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][zp_nr]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['zp_nr'] ?? ''); ?>"
+                                               class="regular-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][zaehlpunktname]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['zaehlpunktname'] ?? ''); ?>"
+                                               class="regular-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="date"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][registriert]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['registriert'] ?? ''); ?>"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][bezugsrichtung]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['bezugsrichtung'] ?? ''); ?>"
+                                               class="regular-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][teilnahme_fkt]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['teilnahme_fkt'] ?? ''); ?>"
+                                               class="regular-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][wechselrichter_nr]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['wechselrichter_nr'] ?? ''); ?>"
+                                               class="regular-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][plz]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['plz'] ?? ''); ?>"
+                                               class="small-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][ort]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['ort'] ?? ''); ?>"
+                                               class="regular-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][strasse]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['strasse'] ?? ''); ?>"
+                                               class="regular-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][hausnummer]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['hausnummer'] ?? ''); ?>"
+                                               class="small-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="date"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][aktiviert]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['aktiviert'] ?? ''); ?>"/>
+                                    </td>
+                                    <td>
+                                        <input type="date"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][deaktiviert]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['deaktiviert'] ?? ''); ?>"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][tarifname]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['tarifname'] ?? ''); ?>"
+                                               class="regular-text"/>
+                                    </td>
+                                    <td>
+                                        <input type="text"
+                                               name="zaehlpunkte[<?php echo (int)$index; ?>][umspannwerk]"
+                                               value="<?php echo esc_attr($zaehlpunkt_row['umspannwerk'] ?? ''); ?>"
+                                               class="regular-text"/>
+                                    </td>
+                                    <td>
+                                        <button type="button" class="button eeg-remove-zaehlpunkt">
+                                            <?php esc_html_e('Entfernen', 'eeg-verwaltung'); ?>
+                                        </button>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                        <p>
+                            <button type="button" class="button" id="eeg-add-zaehlpunkt">
+                                <?php esc_html_e('Zählpunkt hinzufügen', 'eeg-verwaltung'); ?>
+                            </button>
+                        </p>
+                        <script type="text/html" id="eeg-zaehlpunkt-template">
+                            <tr>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][zaehlpunkt]" class="regular-text"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][zp_status]" class="regular-text"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][zp_nr]" class="regular-text"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][zaehlpunktname]" class="regular-text"/></td>
+                                <td><input type="date" name="zaehlpunkte[__INDEX__][registriert]"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][bezugsrichtung]" class="regular-text"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][teilnahme_fkt]" class="regular-text"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][wechselrichter_nr]" class="regular-text"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][plz]" class="small-text"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][ort]" class="regular-text"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][strasse]" class="regular-text"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][hausnummer]" class="small-text"/></td>
+                                <td><input type="date" name="zaehlpunkte[__INDEX__][aktiviert]"/></td>
+                                <td><input type="date" name="zaehlpunkte[__INDEX__][deaktiviert]"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][tarifname]" class="regular-text"/></td>
+                                <td><input type="text" name="zaehlpunkte[__INDEX__][umspannwerk]" class="regular-text"/></td>
+                                <td>
+                                    <button type="button" class="button eeg-remove-zaehlpunkt">
+                                        <?php esc_html_e('Entfernen', 'eeg-verwaltung'); ?>
+                                    </button>
+                                </td>
+                            </tr>
+                        </script>
+                    </td>
+                </tr>
+
+                <tr>
+                    <th scope="row">
                         <label for="status"><?php esc_html_e('Interner Status', 'eeg-verwaltung'); ?></label>
                     </th>
                     <td>
@@ -1153,6 +1481,51 @@ function eeg_verw_render_mitglied_form($id = 0)
                     mask: /^\S*@?\S*$/
                 });
             }
+        });
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var table = document.getElementById('eeg-zaehlpunkte-table');
+            var addButton = document.getElementById('eeg-add-zaehlpunkt');
+            var template = document.getElementById('eeg-zaehlpunkt-template');
+
+            if (!table || !addButton || !template) {
+                return;
+            }
+
+            var tbody = table.querySelector('tbody');
+            if (!tbody) {
+                return;
+            }
+
+            var index = tbody.children.length;
+
+            function addRow() {
+                var html = template.innerHTML.replace(/__INDEX__/g, index);
+                var wrapper = document.createElement('tbody');
+                wrapper.innerHTML = html.trim();
+                var row = wrapper.firstElementChild;
+                if (row) {
+                    tbody.appendChild(row);
+                    index += 1;
+                }
+            }
+
+            addButton.addEventListener('click', function () {
+                addRow();
+            });
+
+            tbody.addEventListener('click', function (event) {
+                var target = event.target;
+                if (target && target.classList.contains('eeg-remove-zaehlpunkt')) {
+                    event.preventDefault();
+                    var row = target.closest('tr');
+                    if (row) {
+                        row.remove();
+                    }
+                }
+            });
         });
     </script>
 

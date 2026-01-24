@@ -18,6 +18,11 @@ function eeg_verw_table_mitgliedsarten(){
     return $wpdb->prefix . 'eeg_mitgliedsarten';
 }
 
+function eeg_verw_table_zaehlpunkte(){
+    global $wpdb;
+    return $wpdb->prefix . 'eeg_zaehlpunkte';
+}
+
 function eeg_verw_table_einstellungen(){
     global $wpdb;
     return $wpdb->prefix . 'eeg_einstellungen';
@@ -28,6 +33,7 @@ function eeg_verw_install_db(){
     $table_mitglieder = eeg_verw_table_mitglieder();
     $table_mitglieder_sequence = eeg_verw_table_mitglieder_sequence();
     $table_mitgliedsarten = eeg_verw_table_mitgliedsarten();
+    $table_zaehlpunkte = eeg_verw_table_zaehlpunkte();
     $table_einstellungen = eeg_verw_table_einstellungen();
     $charset = $wpdb->get_charset_collate();
 
@@ -88,8 +94,36 @@ function eeg_verw_install_db(){
         KEY bezeichnung (bezeichnung)
     ) {$charset};";
 
+    // Tabelle für Zählpunkte
+    $sql4 = "CREATE TABLE {$table_zaehlpunkte} (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        mitglied_id BIGINT UNSIGNED NOT NULL,
+        zaehlpunkt VARCHAR(50) NULL,
+        zp_status VARCHAR(50) NULL,
+        zp_nr VARCHAR(100) NULL,
+        zaehlpunktname VARCHAR(190) NULL,
+        registriert DATE NULL,
+        bezugsrichtung VARCHAR(100) NULL,
+        teilnahme_fkt VARCHAR(100) NULL,
+        wechselrichter_nr VARCHAR(100) NULL,
+        plz VARCHAR(10) NULL,
+        ort VARCHAR(190) NULL,
+        strasse VARCHAR(190) NULL,
+        hausnummer VARCHAR(40) NULL,
+        aktiviert DATE NULL,
+        deaktiviert DATE NULL,
+        tarifname VARCHAR(190) NULL,
+        umspannwerk VARCHAR(190) NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY (id),
+        KEY idx_mitglied (mitglied_id),
+        KEY idx_zaehlpunkt (zaehlpunkt),
+        KEY idx_zp_nr (zp_nr)
+    ) {$charset};";
+
     // Tabelle für EEG Einstellungen
-    $sql4 = "CREATE TABLE {$table_einstellungen} (
+    $sql5 = "CREATE TABLE {$table_einstellungen} (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         name VARCHAR(100) NOT NULL,
         adresse VARCHAR(100) NULL,
@@ -113,8 +147,9 @@ function eeg_verw_install_db(){
     dbDelta($sql2);
     dbDelta($sql3);
     dbDelta($sql4);
+    dbDelta($sql5);
 
-    add_option('eeg_verw_db_version', '1.6');
+    add_option('eeg_verw_db_version', '1.7');
 }
 
 
