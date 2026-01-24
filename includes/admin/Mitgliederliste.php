@@ -671,9 +671,16 @@ function eeg_verw_handle_mitglieder_actions()
         }
 
         // Email prüfen
-        $exists_email = $wpdb->get_var(
-                $wpdb->prepare("SELECT COUNT(*) FROM $table WHERE email = %s", $email)
-        );
+        $exists_email = 0;
+        if ($email !== '') {
+            $exists_email = $wpdb->get_var(
+                    $wpdb->prepare(
+                            "SELECT COUNT(*) FROM $table WHERE email = %s AND id != %d",
+                            $email,
+                            (int)$edit_id
+                    )
+            );
+        }
 
         if ($exists_email) {
             add_settings_error(
