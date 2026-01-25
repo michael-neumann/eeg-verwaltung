@@ -1028,6 +1028,20 @@ function eeg_verw_normalize_sheet_name($value)
     return str_replace(' ', '', $normalized);
 }
 
+function eeg_verw_import_debug_log($message, array $context = [])
+{
+    if (!defined('WP_DEBUG') || !WP_DEBUG) {
+        return;
+    }
+
+    $payload = $message;
+    if (!empty($context)) {
+        $payload .= ' ' . wp_json_encode($context);
+    }
+
+    error_log('[EEG Import] ' . $payload);
+}
+
 function eeg_verw_normalize_date($value)
 {
     if ($value === '' || $value === null) {
@@ -1094,15 +1108,21 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
     }
     $ns_pkg = 'http://schemas.openxmlformats.org/package/2006/relationships';
     $relationships = $rels->children($ns_pkg)->Relationship;
+    $relationship_map = [];
+    foreach ($relationships as $rel) {
+        $relationship_map[(string)$rel['Id']] = (string)$rel['Target'];
+    }
 
     $sheet_target = '';
     $available_sheets = [];
+    $available_sheets_normalized = [];
     $normalized_sheet_name = eeg_verw_normalize_sheet_name($sheet_name);
     foreach ($sheets as $sheet) {
         $name = (string)$sheet['name'];
         $available_sheets[] = $name;
 
         $normalized_name = eeg_verw_normalize_sheet_name($name);
+        $available_sheets_normalized[] = $normalized_name;
         if ($normalized_name === $normalized_sheet_name) {
             $rid_attrs = $sheet->attributes($ns_r);
             $rel_id = (string)$rid_attrs['id'];
@@ -1132,12 +1152,31 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
     if ($sheet_target === '') {
         $zip->close();
         $available = $available_sheets ? implode(', ', $available_sheets) : __('keine', 'eeg-verwaltung');
+        $available_normalized = $available_sheets_normalized ? implode(', ', $available_sheets_normalized) : __('keine', 'eeg-verwaltung');
+        $debug_details = '';
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $debug_details = ' ' . sprintf(
+                __('Debug: Gesuchter Name „%1$s“ (normalisiert: „%2$s“). Normalisierte Arbeitsblätter: %3$s.', 'eeg-verwaltung'),
+                $sheet_name,
+                $normalized_sheet_name,
+                $available_normalized
+            );
+        }
+        eeg_verw_import_debug_log('Arbeitsblatt nicht gefunden.', [
+            'requested' => $sheet_name,
+            'normalized_requested' => $normalized_sheet_name,
+            'available' => $available_sheets,
+            'available_normalized' => $available_sheets_normalized,
+            'relationships' => $relationship_map,
+            'file' => $file_path,
+        ]);
         return new WP_Error(
             'eeg_import_sheet_missing',
             sprintf(
-                __('Arbeitsblatt „%s“ nicht gefunden. Verfügbare Arbeitsblätter: %s.', 'eeg-verwaltung'),
+                __('Arbeitsblatt „%s“ nicht gefunden. Verfügbare Arbeitsblätter: %s.%s', 'eeg-verwaltung'),
                 $sheet_name,
-                $available
+                $available,
+                $debug_details
             )
         );
     }
