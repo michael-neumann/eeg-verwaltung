@@ -1022,6 +1022,12 @@ function eeg_verw_normalize_header($value)
     return $value;
 }
 
+function eeg_verw_normalize_sheet_name($value)
+{
+    $normalized = eeg_verw_normalize_header($value);
+    return str_replace(' ', '', $normalized);
+}
+
 function eeg_verw_normalize_date($value)
 {
     if ($value === '' || $value === null) {
@@ -1090,18 +1096,13 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
     $relationships = $rels->children($ns_pkg)->Relationship;
 
     $sheet_target = '';
+    $available_sheets = [];
+    $normalized_sheet_name = eeg_verw_normalize_sheet_name($sheet_name);
     foreach ($sheets as $sheet) {
         $name = (string)$sheet['name'];
-        $normalized_name = trim($name);
-        $normalized_sheet_name = trim($sheet_name);
-        if (function_exists('mb_strtolower')) {
-            $normalized_name = mb_strtolower($normalized_name);
-            $normalized_sheet_name = mb_strtolower($normalized_sheet_name);
-        } else {
-            $normalized_name = strtolower($normalized_name);
-            $normalized_sheet_name = strtolower($normalized_sheet_name);
-        }
+        $available_sheets[] = $name;
 
+        $normalized_name = eeg_verw_normalize_sheet_name($name);
         if ($normalized_name === $normalized_sheet_name) {
             $rid_attrs = $sheet->attributes($ns_r);
             $rel_id = (string)$rid_attrs['id'];
@@ -1115,11 +1116,29 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
         }
     }
 
+    if ($sheet_target === '' && count($sheets) === 1) {
+        $sheet = $sheets[0];
+        $rid_attrs = $sheet->attributes($ns_r);
+        $rel_id = (string)$rid_attrs['id'];
+        foreach ($relationships as $rel) {
+            if ((string)$rel['Id'] === $rel_id) {
+                $target = (string)$rel['Target'];
+                $sheet_target = 'xl/' . ltrim($target, '/');
+                break;
+            }
+        }
+    }
+
     if ($sheet_target === '') {
         $zip->close();
+        $available = $available_sheets ? implode(', ', $available_sheets) : __('keine', 'eeg-verwaltung');
         return new WP_Error(
             'eeg_import_sheet_missing',
-            sprintf(__('Arbeitsblatt „%s“ nicht gefunden.', 'eeg-verwaltung'), $sheet_name)
+            sprintf(
+                __('Arbeitsblatt „%s“ nicht gefunden. Verfügbare Arbeitsblätter: %s.', 'eeg-verwaltung'),
+                $sheet_name,
+                $available
+            )
         );
     }
 
