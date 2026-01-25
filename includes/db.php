@@ -1,7 +1,24 @@
 <?php
 if (!defined('ABSPATH')) { exit; }
 
-function eeg_verw_db_bootstrap(){}
+function eeg_verw_db_bootstrap(){
+    eeg_verw_maybe_upgrade_db();
+}
+
+function eeg_verw_maybe_upgrade_db(){
+    $target_version = '1.7';
+    $installed_version = get_option('eeg_verw_db_version', '0');
+    if (version_compare((string)$installed_version, $target_version, '<')) {
+        eeg_verw_install_db();
+        update_option('eeg_verw_db_version', $target_version);
+    }
+}
+
+function eeg_verw_table_exists($table_name){
+    global $wpdb;
+    $found = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_name));
+    return $found === $table_name;
+}
 
 function eeg_verw_table_mitglieder(){
     global $wpdb;
@@ -149,7 +166,7 @@ function eeg_verw_install_db(){
     dbDelta($sql4);
     dbDelta($sql5);
 
-    add_option('eeg_verw_db_version', '1.7');
+    update_option('eeg_verw_db_version', '1.7');
 }
 
 
