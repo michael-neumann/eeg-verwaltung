@@ -1063,7 +1063,15 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
     }
 
     $workbook = simplexml_load_string($workbook_xml);
-    if (!$workbook || !isset($workbook->sheets->sheet)) {
+    if (!$workbook) {
+        $zip->close();
+        return new WP_Error('eeg_import_workbook_invalid', __('Workbook konnte nicht gelesen werden.', 'eeg-verwaltung'));
+    }
+
+    $ns_main = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+    $ns_r = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    $sheets = $workbook->children($ns_main)->sheets->sheet;
+    if (!$sheets) {
         $zip->close();
         return new WP_Error('eeg_import_workbook_invalid', __('Workbook konnte nicht gelesen werden.', 'eeg-verwaltung'));
     }
@@ -1074,17 +1082,34 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
         return new WP_Error('eeg_import_rels_missing', __('Workbook-Beziehungen fehlen.', 'eeg-verwaltung'));
     }
     $rels = simplexml_load_string($rels_xml);
+    if (!$rels) {
+        $zip->close();
+        return new WP_Error('eeg_import_rels_invalid', __('Workbook-Beziehungen konnten nicht gelesen werden.', 'eeg-verwaltung'));
+    }
+    $ns_pkg = 'http://schemas.openxmlformats.org/package/2006/relationships';
+    $relationships = $rels->children($ns_pkg)->Relationship;
 
     $sheet_target = '';
-    foreach ($workbook->sheets->sheet as $sheet) {
+    foreach ($sheets as $sheet) {
         $name = (string)$sheet['name'];
-        if ($name === $sheet_name) {
-            $rel_id = (string)$sheet['r:id'];
-            foreach ($rels->Relationship as $rel) {
+        $normalized_name = trim($name);
+        $normalized_sheet_name = trim($sheet_name);
+        if (function_exists('mb_strtolower')) {
+            $normalized_name = mb_strtolower($normalized_name);
+            $normalized_sheet_name = mb_strtolower($normalized_sheet_name);
+        } else {
+            $normalized_name = strtolower($normalized_name);
+            $normalized_sheet_name = strtolower($normalized_sheet_name);
+        }
+
+        if ($normalized_name === $normalized_sheet_name) {
+            $rid_attrs = $sheet->attributes($ns_r);
+            $rel_id = (string)$rid_attrs['id'];
+            foreach ($relationships as $rel) {
                 if ((string)$rel['Id'] === $rel_id) {
                     $target = (string)$rel['Target'];
                     $sheet_target = 'xl/' . ltrim($target, '/');
-                    break;
+                    break 2;
                 }
             }
         }
@@ -1092,7 +1117,10 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
 
     if ($sheet_target === '') {
         $zip->close();
-        return new WP_Error('eeg_import_sheet_missing', __('Arbeitsblatt „Mitglieder“ nicht gefunden.', 'eeg-verwaltung'));
+        return new WP_Error(
+            'eeg_import_sheet_missing',
+            sprintf(__('Arbeitsblatt „%s“ nicht gefunden.', 'eeg-verwaltung'), $sheet_name)
+        );
     }
 
     $shared_strings = [];
