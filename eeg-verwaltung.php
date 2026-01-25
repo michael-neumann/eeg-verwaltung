@@ -41,6 +41,7 @@ add_action('plugins_loaded', function () {
         'includes/menu-guard.php',
         'includes/admin/Mitgliederliste.php',
         'includes/admin/Mitgliedsarten.php',
+        'includes/admin/Import.php',
         'includes/downloads.php',
         'includes/utils/security.php',
         'includes/utils/iban_checker.php',
@@ -77,6 +78,15 @@ add_action('admin_menu', function () {
         'eeg-mitgliedsarten',
         'eeg_verw_admin_mitgliedsarten_page'
     );
+
+    add_submenu_page(
+        'eeg-admin',
+        'Stammdaten-Import',
+        'Stammdaten-Import',
+        'manage_options',
+        'eeg-import',
+        'eeg_verw_admin_import_page'
+    );
 });
 
 function eeg_verw_admin_welcome() {
@@ -90,6 +100,5 @@ add_action('deleted_user', function($user_id) {
     // falls du 1:1-Beziehung hast:
     $wpdb->delete($table, ['user_id' => (int)$user_id], ['%d']);
 }, 10, 1);
-
 
 
