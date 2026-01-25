@@ -426,6 +426,11 @@ function eeg_verw_save_mitglied_zaehlpunkte($mitglied_id, $rows)
         return;
     }
 
+    eeg_verw_maybe_upgrade_db();
+    if (!eeg_verw_table_exists($table_zp)) {
+        return;
+    }
+
     $wpdb->delete($table_zp, ['mitglied_id' => $mitglied_id], ['%d']);
 
     if (empty($rows)) {
@@ -885,6 +890,8 @@ function eeg_verw_render_mitglied_form($id = 0)
     $table_a = eeg_verw_table_mitgliedsarten();
     $table_zp = eeg_verw_table_zaehlpunkte();
 
+    eeg_verw_maybe_upgrade_db();
+
     $row = [
             'id' => 0,
             'mitgliedsnummer' => '',
@@ -915,7 +922,7 @@ function eeg_verw_render_mitglied_form($id = 0)
     }
 
     $zaehlpunkte = [];
-    if (!empty($id)) {
+    if (!empty($id) && eeg_verw_table_exists($table_zp)) {
         $zaehlpunkte = $wpdb->get_results(
                 $wpdb->prepare("SELECT * FROM {$table_zp} WHERE mitglied_id = %d ORDER BY id ASC", $id),
                 ARRAY_A
