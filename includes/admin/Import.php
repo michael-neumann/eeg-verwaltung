@@ -1076,6 +1076,7 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
         return new WP_Error('eeg_import_zip_open', __('Die Excel-Datei konnte nicht geöffnet werden.', 'eeg-verwaltung'));
     }
 
+    // --- workbook.xml laden ---
     $workbook_xml = $zip->getFromName('xl/workbook.xml');
     if ($workbook_xml === false) {
         $zip->close();
@@ -1088,16 +1089,16 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
         return new WP_Error('eeg_import_workbook_invalid', __('Workbook konnte nicht gelesen werden.', 'eeg-verwaltung'));
     }
 
-    // --- Robust: Sheets per XPath (namespace-aware) lesen ---
+    // Sheets robust per XPath (namespace-aware)
     $workbook->registerXPathNamespace('m', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
-    $sheet_nodes = $workbook->xpath('//m:sheets/m:sheet');
+    $sheets = $workbook->xpath('//m:sheets/m:sheet');
 
-    if (!$sheet_nodes || !is_array($sheet_nodes) || count($sheet_nodes) === 0) {
+    if (!$sheets || !is_array($sheets) || count($sheets) === 0) {
         $zip->close();
         return new WP_Error('eeg_import_workbook_invalid', __('Workbook konnte nicht gelesen werden.', 'eeg-verwaltung'));
     }
 
-    // --- workbook relationships (.rels) laden ---
+    // --- workbook.xml.rels laden ---
     $rels_xml = $zip->getFromName('xl/_rels/workbook.xml.rels');
     if ($rels_xml === false) {
         $zip->close();
@@ -1110,58 +1111,83 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
         return new WP_Error('eeg_import_rels_invalid', __('Workbook-Beziehungen konnten nicht gelesen werden.', 'eeg-verwaltung'));
     }
 
-    // Robust: Relationship-Targets per XPath (namespace-aware)
+    // Relationships robust per XPath (namespace-aware)
     $rels->registerXPathNamespace('pr', 'http://schemas.openxmlformats.org/package/2006/relationships');
+    $rel_nodes = $rels->xpath('//pr:Relationship') ?: [];
 
+    // Map: rId -> Target
+    $rel_map = [];
+    foreach ($rel_nodes as $rel) {
+        $id = (string)$rel['Id'];
+        $target = (string)$rel['Target'];
+        if ($id !== '') {
+            $rel_map[$id] = $target;
+        }
+    }
+
+    // --- Sheet finden + Target auflösen ---
     $sheet_target = '';
     $available_sheets = [];
     $available_sheets_normalized = [];
+
     $normalized_sheet_name = eeg_verw_normalize_sheet_name($sheet_name);
 
-    foreach ($sheet_nodes as $sheet) {
+    $sheet_found = false;
+    $sheet_rel_id = '';
+
+    foreach ($sheets as $sheet) {
         $name = (string)$sheet['name'];
         $available_sheets[] = $name;
 
         $normalized_name = eeg_verw_normalize_sheet_name($name);
         $available_sheets_normalized[] = $normalized_name;
 
-        // Match (normalisiert)
         if ($normalized_name === $normalized_sheet_name) {
-            // r:id ist im OfficeDocument-namespace -> korrekt auslesen
-            $rel_id = (string) $sheet->attributes('r', true)['id'];
-            if ($rel_id === '') {
+            $sheet_found = true;
+
+            // r:id liegt im officeDocument relationships namespace -> so zuverlässig lesen
+            $sheet_rel_id = (string) $sheet->attributes('r', true)['id'];
+            if ($sheet_rel_id === '') {
                 $zip->close();
                 return new WP_Error('eeg_import_relid_missing', __('Worksheet-Verknüpfung (r:id) fehlt.', 'eeg-verwaltung'));
             }
 
-            // Relationship Target suchen
-            $relNodes = $rels->xpath('//pr:Relationship[@Id="' . $rel_id . '"]');
-            if ($relNodes && isset($relNodes[0])) {
-                $target = (string)$relNodes[0]['Target'];
-                // Target ist relativ zu xl/ -> in voller ZIP-Pfadform bauen
-                $sheet_target = 'xl/' . ltrim($target, '/');
-                break;
+            if (!isset($rel_map[$sheet_rel_id])) {
+                $zip->close();
+                return new WP_Error(
+                    'eeg_import_relationship_missing',
+                    sprintf(
+                        __('Arbeitsblatt „%s“ gefunden, aber Relationship „%s“ fehlt in workbook.xml.rels.', 'eeg-verwaltung'),
+                        $sheet_name,
+                        $sheet_rel_id
+                    )
+                );
             }
+
+            $target = $rel_map[$sheet_rel_id];
+            $sheet_target = 'xl/' . ltrim($target, '/');
+            break;
         }
     }
 
-    // Fallback: genau 1 Sheet -> nimm dieses, auch wenn Name nicht matched
-    if ($sheet_target === '' && count($sheet_nodes) === 1) {
-        $sheet = $sheet_nodes[0];
-        $rel_id = (string) $sheet->attributes('r', true)['id'];
-        if ($rel_id === '') {
+    // Fallback: Wenn genau 1 Sheet existiert, nimm dieses (auch wenn Name nicht matched)
+    if ($sheet_target === '' && count($sheets) === 1) {
+        $sheet = $sheets[0];
+        $sheet_rel_id = (string) $sheet->attributes('r', true)['id'];
+        if ($sheet_rel_id === '') {
             $zip->close();
             return new WP_Error('eeg_import_relid_missing', __('Worksheet-Verknüpfung (r:id) fehlt.', 'eeg-verwaltung'));
         }
 
-        $relNodes = $rels->xpath('//pr:Relationship[@Id="' . $rel_id . '"]');
-        if ($relNodes && isset($relNodes[0])) {
-            $target = (string)$relNodes[0]['Target'];
+        if (isset($rel_map[$sheet_rel_id])) {
+            $target = $rel_map[$sheet_rel_id];
             $sheet_target = 'xl/' . ltrim($target, '/');
+            $sheet_found = true;
         }
     }
 
-    if ($sheet_target === '') {
+    // Echte Unterscheidung: Sheet nicht gefunden vs. Target nicht auflösbar
+    if ($sheet_target === '' && !$sheet_found) {
         $zip->close();
         $available = $available_sheets ? implode(', ', $available_sheets) : __('keine', 'eeg-verwaltung');
         return new WP_Error(
@@ -1174,10 +1200,20 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
         );
     }
 
-    // Sicherstellen, dass das Sheet im ZIP wirklich existiert
+    if ($sheet_target === '' && $sheet_found) {
+        $zip->close();
+        return new WP_Error(
+            'eeg_import_sheet_target_missing',
+            sprintf(
+                __('Arbeitsblatt „%s“ gefunden, aber konnte nicht auf eine Worksheet-Datei auflösen (r:id=%s).', 'eeg-verwaltung'),
+                $sheet_name,
+                $sheet_rel_id
+            )
+        );
+    }
+
+    // Prüfen, ob die Worksheet-Datei im ZIP wirklich existiert
     if ($zip->locateName($sheet_target) === false) {
-        // Manche Dateien haben Targets wie "worksheets/sheet1.xml" (ok) – andere evtl. mit leading "../"
-        // -> hier bewusst hart abbrechen mit Diagnose
         $zip->close();
         return new WP_Error(
             'eeg_import_sheet_missing_in_zip',
@@ -1197,7 +1233,7 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
         }
     }
 
-    // --- Sheet XML ---
+    // --- Sheet XML laden ---
     $sheet_xml = $zip->getFromName($sheet_target);
     $zip->close();
 
@@ -1210,6 +1246,7 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
         return new WP_Error('eeg_import_sheet_invalid', __('Arbeitsblatt enthält keine Daten.', 'eeg-verwaltung'));
     }
 
+    // --- Zellen auslesen ---
     $rows = [];
     foreach ($sheet->sheetData->row as $row) {
         $row_data = [];
@@ -1240,6 +1277,7 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
 
     return $rows;
 }
+
 function eeg_verw_shared_string_value($si)
 {
     if (isset($si->t)) {
