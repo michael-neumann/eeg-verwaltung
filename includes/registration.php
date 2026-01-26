@@ -131,7 +131,7 @@ function eeg_register_shortcode($atts = [])
                         ],
                         [
                                 '%d', // user_id
-                                '%d', // mitgliedsnummer
+                                '%s', // mitgliedsnummer
                                 '%d', // mitgliedsart_id
                                 '%s', // vorname
                                 '%s', // nachname
