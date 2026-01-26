@@ -1228,6 +1228,32 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
         }
     }
 
+    // styles (für führende Nullen)
+    $style_numfmts = [];
+    $custom_numfmts = [];
+    $styles_xml = $zip->getFromName('xl/styles.xml');
+    if ($styles_xml !== false) {
+        $styles = simplexml_load_string($styles_xml);
+        if ($styles) {
+            if (isset($styles->numFmts->numFmt)) {
+                foreach ($styles->numFmts->numFmt as $num_fmt) {
+                    $num_fmt_id = (int)$num_fmt['numFmtId'];
+                    $format_code = (string)$num_fmt['formatCode'];
+                    if ($num_fmt_id) {
+                        $custom_numfmts[$num_fmt_id] = $format_code;
+                    }
+                }
+            }
+            if (isset($styles->cellXfs->xf)) {
+                $index = 0;
+                foreach ($styles->cellXfs->xf as $xf) {
+                    $style_numfmts[$index] = (int)$xf['numFmtId'];
+                    $index++;
+                }
+            }
+        }
+    }
+
     // Sheet XML
     $sheet_xml = $zip->getFromName($sheet_target);
     $zip->close();
@@ -1250,6 +1276,7 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
 
             $value = '';
             $cell_type = (string)$cell['t'];
+            $style_index = isset($cell['s']) ? (int)$cell['s'] : null;
 
             if ($cell_type === 's') {
                 $idx = (int)$cell->v;
@@ -1258,6 +1285,18 @@ function eeg_verw_read_xlsx_sheet($file_path, $sheet_name)
                 $value = (string)$cell->is->t;
             } else {
                 $value = (string)$cell->v;
+                if ($style_index !== null && $value !== '') {
+                    $num_fmt_id = $style_numfmts[$style_index] ?? null;
+                    if ($num_fmt_id) {
+                        $format_code = eeg_verw_number_format_code($num_fmt_id, $custom_numfmts);
+                        if ($format_code) {
+                            $formatted = eeg_verw_format_numeric_with_format($value, $format_code);
+                            if ($formatted !== null) {
+                                $value = $formatted;
+                            }
+                        }
+                    }
+                }
             }
 
             $row_data[$col_index] = $value;
@@ -1298,4 +1337,59 @@ function eeg_verw_column_index_from_cell($cell_ref)
     }
 
     return $index - 1;
+}
+
+function eeg_verw_number_format_code($num_fmt_id, array $custom_formats)
+{
+    if (isset($custom_formats[$num_fmt_id])) {
+        return $custom_formats[$num_fmt_id];
+    }
+
+    $built_in = [
+        1 => '0',
+        2 => '0.00',
+        3 => '#,##0',
+        4 => '#,##0.00',
+        9 => '0%',
+        10 => '0.00%',
+        11 => '0.00E+00',
+        12 => '# ?/?',
+        13 => '# ??/??',
+        14 => 'm/d/yy',
+        15 => 'd-mmm-yy',
+        16 => 'd-mmm',
+        17 => 'mmm-yy',
+        18 => 'h:mm AM/PM',
+        19 => 'h:mm:ss AM/PM',
+        20 => 'h:mm',
+        21 => 'h:mm:ss',
+        22 => 'm/d/yy h:mm',
+        37 => '#,##0 ;(#,##0)',
+        38 => '#,##0 ;[Red](#,##0)',
+        39 => '#,##0.00;(#,##0.00)',
+        40 => '#,##0.00;[Red](#,##0.00)',
+        49 => '@',
+    ];
+
+    return $built_in[$num_fmt_id] ?? '';
+}
+
+function eeg_verw_format_numeric_with_format($value, $format_code)
+{
+    $sections = explode(';', $format_code);
+    $format = trim($sections[0]);
+    if ($format === '' || $format === '@') {
+        return null;
+    }
+
+    if (preg_match('/^0+$/', $format) !== 1) {
+        return null;
+    }
+
+    $raw = trim((string)$value);
+    if (!preg_match('/^\d+$/', $raw)) {
+        return null;
+    }
+
+    return str_pad($raw, strlen($format), '0', STR_PAD_LEFT);
 }
