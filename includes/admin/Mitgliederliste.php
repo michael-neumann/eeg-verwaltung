@@ -89,15 +89,25 @@ class EEG_Verw_Mitglieder_List_Table extends WP_List_Table
                 }
                 return '—';
             case 'zaehlpunkte':
-                $active = isset($item['zaehlpunkte_active']) ? (int)$item['zaehlpunkte_active'] : 0;
-                $inactive = isset($item['zaehlpunkte_inactive']) ? (int)$item['zaehlpunkte_inactive'] : 0;
-                return sprintf(
-                        '%s: %d / %s: %d',
-                        esc_html__('Aktiv', 'eeg-verwaltung'),
-                        $active,
-                        esc_html__('Inaktiv', 'eeg-verwaltung'),
-                        $inactive
-                );
+                $status_counts = $item['zaehlpunkte_status_counts'] ?? [];
+                if (empty($status_counts)) {
+                    return '—';
+                }
+
+                $parts = [];
+                foreach ($status_counts as $status => $count) {
+                    if ((int)$count <= 0) {
+                        continue;
+                    }
+                    $label = $status !== '' ? $status : esc_html__('Ohne Status', 'eeg-verwaltung');
+                    $parts[] = sprintf('%s: %d', esc_html($label), (int)$count);
+                }
+
+                if (empty($parts)) {
+                    return '—';
+                }
+
+                return implode(' / ', $parts);
             case 'aktiv':
                 if (function_exists('eeg_verw_badge_aktiv')) {
                     return eeg_verw_badge_aktiv($item['aktiv']);
@@ -324,8 +334,6 @@ class EEG_Verw_Mitglieder_List_Table extends WP_List_Table
                 m.mitgliedsnummer,
                 CONCAT_WS(' ', m.vorname, m.nachname) AS name,
                 a.bezeichnung AS mitgliedsart,
-                COALESCE(zp.active_count, 0) AS zaehlpunkte_active,
-                COALESCE(zp.inactive_count, 0) AS zaehlpunkte_inactive,
                 m.email,
                 m.telefonnummer,
                 CONCAT_WS(' ', m.strasse, m.hausnummer) AS adresse,
@@ -334,14 +342,6 @@ class EEG_Verw_Mitglieder_List_Table extends WP_List_Table
                 m.created_at
             FROM {$table_m} m
             LEFT JOIN {$table_a} a ON a.id = m.mitgliedsart_id
-            LEFT JOIN (
-                SELECT
-                    mitglied_id,
-                    SUM(CASE WHEN deaktiviert IS NULL OR deaktiviert = '' OR deaktiviert = '0000-00-00' THEN 1 ELSE 0 END) AS active_count,
-                    SUM(CASE WHEN deaktiviert IS NULL OR deaktiviert = '' OR deaktiviert = '0000-00-00' THEN 0 ELSE 1 END) AS inactive_count
-                FROM {$table_zp}
-                GROUP BY mitglied_id
-            ) zp ON zp.mitglied_id = m.id
             {$where_sql}
             ORDER BY {$order_by_sql} {$order}
             LIMIT %d OFFSET %d
@@ -354,7 +354,33 @@ class EEG_Verw_Mitglieder_List_Table extends WP_List_Table
         $query = $wpdb->prepare($sql_list, $list_args);
         $rows = $wpdb->get_results($query, ARRAY_A);
 
+        $status_counts = [];
+        if (!empty($rows)) {
+            $ids = array_map('intval', array_column($rows, 'id'));
+            $ids = array_values(array_filter($ids));
+            if (!empty($ids)) {
+                $placeholders = implode(',', array_fill(0, count($ids), '%d'));
+                $status_sql = "
+                    SELECT mitglied_id, zp_status, COUNT(*) AS status_count
+                    FROM {$table_zp}
+                    WHERE mitglied_id IN ({$placeholders})
+                    GROUP BY mitglied_id, zp_status
+                ";
+                $status_rows = $wpdb->get_results($wpdb->prepare($status_sql, $ids), ARRAY_A);
+                foreach ($status_rows as $status_row) {
+                    $mitglied_id = (int)$status_row['mitglied_id'];
+                    $status = isset($status_row['zp_status']) ? (string)$status_row['zp_status'] : '';
+                    $status_counts[$mitglied_id][trim($status)] = (int)$status_row['status_count'];
+                }
+            }
+        }
+
         if (is_array($rows)) {
+            foreach ($rows as &$row) {
+                $row_id = (int)$row['id'];
+                $row['zaehlpunkte_status_counts'] = $status_counts[$row_id] ?? [];
+            }
+            unset($row);
             $this->items = $rows;
         } else {
             $this->items = [];
