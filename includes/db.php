@@ -43,7 +43,7 @@ function eeg_verw_install_db(){
     $sql1 = "CREATE TABLE {$table_mitglieder} (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         user_id BIGINT UNSIGNED NOT NULL,
-        mitgliedsnummer BIGINT UNSIGNED NOT NULL,
+        mitgliedsnummer VARCHAR(40) NOT NULL,
         mitgliedsart_id BIGINT UNSIGNED NOT NULL,
         vorname VARCHAR(100) NULL,
         nachname VARCHAR(100) NULL,
