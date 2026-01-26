@@ -37,6 +37,7 @@ class EEG_Verw_Mitglieder_List_Table extends WP_List_Table
                 'mitgliedsnummer' => __('Mitgliedsnummer', 'eeg-verwaltung'),
                 'mitgliedsart' => __('Mitgliedsart', 'eeg-verwaltung'),
                 'name' => __('Name', 'eeg-verwaltung'),
+                'zaehlpunkte' => __('Zählpunkte', 'eeg-verwaltung'),
                 'adresse' => __('Adresse', 'eeg-verwaltung'),
                 'ort' => __('Ort', 'eeg-verwaltung'),
                 'telefonnummer' => __('Telefon', 'eeg-verwaltung'),
@@ -87,6 +88,16 @@ class EEG_Verw_Mitglieder_List_Table extends WP_List_Table
                     return esc_html($item['mitgliedsart']);
                 }
                 return '—';
+            case 'zaehlpunkte':
+                $active = isset($item['zaehlpunkte_active']) ? (int)$item['zaehlpunkte_active'] : 0;
+                $inactive = isset($item['zaehlpunkte_inactive']) ? (int)$item['zaehlpunkte_inactive'] : 0;
+                return sprintf(
+                        '%s: %d / %s: %d',
+                        esc_html__('Aktiv', 'eeg-verwaltung'),
+                        $active,
+                        esc_html__('Inaktiv', 'eeg-verwaltung'),
+                        $inactive
+                );
             case 'aktiv':
                 if (function_exists('eeg_verw_badge_aktiv')) {
                     return eeg_verw_badge_aktiv($item['aktiv']);
@@ -236,6 +247,7 @@ class EEG_Verw_Mitglieder_List_Table extends WP_List_Table
 
         $table_m = eeg_verw_table_mitglieder();
         $table_a = eeg_verw_table_mitgliedsarten();
+        $table_zp = eeg_verw_table_zaehlpunkte();
 
         $per_page = 20;
         $current_page = max(1, $this->get_pagenum());
@@ -312,6 +324,8 @@ class EEG_Verw_Mitglieder_List_Table extends WP_List_Table
                 m.mitgliedsnummer,
                 CONCAT_WS(' ', m.vorname, m.nachname) AS name,
                 a.bezeichnung AS mitgliedsart,
+                COALESCE(zp.active_count, 0) AS zaehlpunkte_active,
+                COALESCE(zp.inactive_count, 0) AS zaehlpunkte_inactive,
                 m.email,
                 m.telefonnummer,
                 CONCAT_WS(' ', m.strasse, m.hausnummer) AS adresse,
@@ -320,6 +334,14 @@ class EEG_Verw_Mitglieder_List_Table extends WP_List_Table
                 m.created_at
             FROM {$table_m} m
             LEFT JOIN {$table_a} a ON a.id = m.mitgliedsart_id
+            LEFT JOIN (
+                SELECT
+                    mitglied_id,
+                    SUM(CASE WHEN deaktiviert IS NULL OR deaktiviert = '' OR deaktiviert = '0000-00-00' THEN 1 ELSE 0 END) AS active_count,
+                    SUM(CASE WHEN deaktiviert IS NULL OR deaktiviert = '' OR deaktiviert = '0000-00-00' THEN 0 ELSE 1 END) AS inactive_count
+                FROM {$table_zp}
+                GROUP BY mitglied_id
+            ) zp ON zp.mitglied_id = m.id
             {$where_sql}
             ORDER BY {$order_by_sql} {$order}
             LIMIT %d OFFSET %d
