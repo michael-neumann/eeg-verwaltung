@@ -273,6 +273,9 @@ function eeg_verw_parse_mitglieder_xlsx($file_path)
         }
 
         $mitgliedsnummer = trim((string)($data['mitgliedsnummer'] ?? ''));
+        if (function_exists('eeg_verw_format_mitgliedsnummer')) {
+            $mitgliedsnummer = eeg_verw_format_mitgliedsnummer($mitgliedsnummer);
+        }
         if ($mitgliedsnummer === '') {
             $errors[] = sprintf(__('Zeile %d: Keine Mitgliedsnummer.', 'eeg-verwaltung'), $row_index + 2);
             continue;
@@ -432,6 +435,9 @@ function eeg_verw_build_import_preview($parsed)
     $updated_zaehlpunkte = [];
 
     foreach ($members as $mitgliedsnummer => $member) {
+        if (function_exists('eeg_verw_format_mitgliedsnummer')) {
+            $mitgliedsnummer = eeg_verw_format_mitgliedsnummer($mitgliedsnummer);
+        }
         $normalized = eeg_verw_normalize_member_payload($member);
         $existing = $existing_map[$mitgliedsnummer] ?? null;
 
@@ -516,6 +522,9 @@ function eeg_verw_apply_import($members)
     ];
 
     foreach ($members as $mitgliedsnummer => $member) {
+        if (function_exists('eeg_verw_format_mitgliedsnummer')) {
+            $mitgliedsnummer = eeg_verw_format_mitgliedsnummer($mitgliedsnummer);
+        }
         $normalized = eeg_verw_normalize_member_payload($member);
         $existing = $existing_map[$mitgliedsnummer] ?? null;
 
@@ -722,7 +731,9 @@ function eeg_verw_normalize_member_payload($member)
     $steuernummer = trim((string)($member['steuernummer'] ?? ''));
 
     return [
-        'mitgliedsnummer' => trim((string)($member['mitgliedsnummer'] ?? '')),
+        'mitgliedsnummer' => function_exists('eeg_verw_format_mitgliedsnummer')
+            ? eeg_verw_format_mitgliedsnummer(trim((string)($member['mitgliedsnummer'] ?? '')))
+            : trim((string)($member['mitgliedsnummer'] ?? '')),
         'firma' => $firma,
         'vorname' => $vorname,
         'nachname' => $nachname,
