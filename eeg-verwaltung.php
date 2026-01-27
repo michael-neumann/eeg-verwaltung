@@ -43,6 +43,7 @@ add_action('plugins_loaded', function () {
         'includes/admin/Mitgliedsarten.php',
         'includes/admin/Einstellungen.php',
         'includes/admin/Import.php',
+        'includes/admin/VerwaisteZaehlpunkte.php',
         'includes/downloads.php',
         'includes/utils/security.php',
         'includes/utils/iban_checker.php',
@@ -97,6 +98,15 @@ add_action('admin_menu', function () {
         'eeg-einstellungen',
         'eeg_verw_admin_einstellungen_page'
     );
+
+    add_submenu_page(
+        'eeg-admin',
+        'Verwaiste Zählpunkte',
+        'Verwaiste Zählpunkte',
+        'manage_options',
+        'eeg-verwaiste-zaehlpunkte',
+        'eeg_verw_admin_verwaiste_zaehlpunkte_page'
+    );
 });
 
 function eeg_verw_admin_welcome() {
@@ -107,7 +117,10 @@ function eeg_verw_admin_welcome() {
 add_action('deleted_user', function($user_id) {
     global $wpdb;
     $table = eeg_verw_table_mitglieder();
+    $mitglied_ids = $wpdb->get_col($wpdb->prepare("SELECT id FROM {$table} WHERE user_id = %d", (int)$user_id));
+    if (!empty($mitglied_ids)) {
+        eeg_verw_delete_zaehlpunkte_for_mitglieder($mitglied_ids);
+    }
     // falls du 1:1-Beziehung hast:
     $wpdb->delete($table, ['user_id' => (int)$user_id], ['%d']);
 }, 10, 1);
-
