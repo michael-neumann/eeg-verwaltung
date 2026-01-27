@@ -746,6 +746,9 @@ function eeg_verw_handle_mitglieder_actions()
         if ($mitgliedsnummer === '' && function_exists('eeg_verw_get_mitgliedsnummer')) {
             $mitgliedsnummer = (string)eeg_verw_get_mitgliedsnummer(0);
         }
+        if (function_exists('eeg_verw_format_mitgliedsnummer')) {
+            $mitgliedsnummer = eeg_verw_format_mitgliedsnummer($mitgliedsnummer);
+        }
 
         $data = [
                 'mitgliedsart_id' => $mitgliedsart_id,
