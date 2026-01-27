@@ -34,6 +34,27 @@ function eeg_verw_table_einstellungen(){
     return $wpdb->prefix . 'eeg_einstellungen';
 }
 
+function eeg_verw_delete_zaehlpunkte_for_mitglieder($mitglied_ids)
+{
+    global $wpdb;
+    $table = eeg_verw_table_zaehlpunkte();
+
+    if (!is_array($mitglied_ids)) {
+        $mitglied_ids = [$mitglied_ids];
+    }
+
+    $mitglied_ids = array_map('absint', $mitglied_ids);
+    $mitglied_ids = array_filter($mitglied_ids);
+
+    if (empty($mitglied_ids)) {
+        return;
+    }
+
+    $placeholders = implode(',', array_fill(0, count($mitglied_ids), '%d'));
+    $sql = "DELETE FROM {$table} WHERE mitglied_id IN ({$placeholders})";
+    $wpdb->query($wpdb->prepare($sql, $mitglied_ids));
+}
+
 function eeg_verw_install_db(){
     global $wpdb;
     $table_mitglieder = eeg_verw_table_mitglieder();

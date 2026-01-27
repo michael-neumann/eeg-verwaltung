@@ -595,6 +595,7 @@ function eeg_verw_handle_mitglieder_actions()
             }
         } elseif ($action === 'delete') {
             check_admin_referer('eeg_mitglied_delete_' . $id);
+            eeg_verw_delete_zaehlpunkte_for_mitglieder($id);
             $wpdb->delete($table, ['id' => $id], ['%d']);
             add_settings_error(
                     'eeg_mitglieder',
@@ -645,6 +646,7 @@ function eeg_verw_handle_mitglieder_actions()
                     );
                 }
             } elseif ($action === 'bulk_delete') {
+                eeg_verw_delete_zaehlpunkte_for_mitglieder($ids);
                 $sql = "DELETE FROM {$table} WHERE id IN ({$in_placeholder})";
                 $wpdb->query($wpdb->prepare($sql, $ids));
 
