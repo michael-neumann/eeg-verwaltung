@@ -282,7 +282,7 @@ function eeg_verw_handle_verwaiste_zaehlpunkte_actions()
         exit;
     }
 }
-add_action('admin_init', 'eeg_verw_handle_verwaiste_zaehlpunkte_actions');
+add_action('load-eeg_page_eeg-verwaiste-zaehlpunkte', 'eeg_verw_handle_verwaiste_zaehlpunkte_actions');
 
 function eeg_verw_admin_verwaiste_zaehlpunkte_page()
 {
