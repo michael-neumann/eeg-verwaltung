@@ -185,12 +185,24 @@ class EEG_Verw_Verwaiste_Zaehlpunkte_List_Table extends WP_List_Table
         $list_args[] = $per_page;
         $list_args[] = $offset;
 
-        $this->items = $wpdb->get_results($wpdb->prepare($sql_list, $list_args), ARRAY_A);
+        $rows = $wpdb->get_results($wpdb->prepare($sql_list, $list_args), ARRAY_A);
+        $this->items = is_array($rows) ? $rows : [];
+
+        $total_pages = 1;
+        if ($this->items_total > 0) {
+            $total_pages = (int)ceil($this->items_total / $per_page);
+        }
 
         $this->set_pagination_args([
                 'total_items' => $this->items_total,
                 'per_page' => $per_page,
+                'total_pages' => $total_pages,
         ]);
+
+        $columns = $this->get_columns();
+        $hidden = [];
+        $sortable = $this->get_sortable_columns();
+        $this->_column_headers = [$columns, $hidden, $sortable, $this->get_primary_column_name()];
     }
 
     public function no_items()
