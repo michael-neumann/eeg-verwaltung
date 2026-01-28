@@ -282,8 +282,6 @@ function eeg_verw_handle_verwaiste_zaehlpunkte_actions()
         exit;
     }
 }
-add_action('load-eeg_page_eeg-verwaiste-zaehlpunkte', 'eeg_verw_handle_verwaiste_zaehlpunkte_actions');
-
 function eeg_verw_admin_verwaiste_zaehlpunkte_page()
 {
     if (!current_user_can('manage_options')) {
