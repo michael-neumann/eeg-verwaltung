@@ -99,7 +99,7 @@ add_action('admin_menu', function () {
         'eeg_verw_admin_einstellungen_page'
     );
 
-    add_submenu_page(
+    $verwaiste_hook = add_submenu_page(
         'eeg-admin',
         'Verwaiste Zählpunkte',
         'Verwaiste Zählpunkte',
@@ -107,6 +107,10 @@ add_action('admin_menu', function () {
         'eeg-verwaiste-zaehlpunkte',
         'eeg_verw_admin_verwaiste_zaehlpunkte_page'
     );
+
+    if ($verwaiste_hook) {
+        add_action('load-' . $verwaiste_hook, 'eeg_verw_handle_verwaiste_zaehlpunkte_actions');
+    }
 });
 
 function eeg_verw_admin_welcome() {
