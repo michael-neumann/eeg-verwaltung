@@ -72,7 +72,8 @@ class EEG_Verw_Verwaiste_Zaehlpunkte_List_Table extends WP_List_Table
                 ],
                 admin_url('admin.php')
         );
-        $delete_url = wp_nonce_url($delete_url, 'eeg_zp_orphan_delete');
+        $nonce_action = 'eeg_zp_orphan_delete_' . (int)$item['id'];
+        $delete_url = wp_nonce_url($delete_url, $nonce_action);
 
         $label = $item['zaehlpunkt'] !== '' ? $item['zaehlpunkt'] : __('(ohne Zählpunkt)', 'eeg-verwaltung');
 
@@ -241,7 +242,8 @@ function eeg_verw_handle_verwaiste_zaehlpunkte_actions()
     $table = eeg_verw_table_zaehlpunkte();
 
     if (!empty($id) && $action === 'delete') {
-        check_admin_referer('eeg_zp_orphan_delete');
+        $nonce_action = 'eeg_zp_orphan_delete_' . $id;
+        check_admin_referer($nonce_action);
         $wpdb->delete($table, ['id' => $id], ['%d']);
 
         add_settings_error(
