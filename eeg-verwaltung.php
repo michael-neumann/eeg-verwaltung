@@ -113,6 +113,8 @@ add_action('admin_menu', function () {
     }
 });
 
+add_action('admin_init', 'eeg_verw_handle_verwaiste_zaehlpunkte_actions');
+
 function eeg_verw_admin_welcome() {
     echo '<div class="wrap"><h1>EEG Verwaltung</h1><p>Wähle eine Funktion im Menü.</p></div>';
 }
